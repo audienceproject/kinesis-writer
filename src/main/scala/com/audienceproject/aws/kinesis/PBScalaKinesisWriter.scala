@@ -23,16 +23,6 @@ import scala.util.Random
   */
 object PBScalaKinesisWriter {
 
-    try {
-        Class.forName("com.amazonaws.kinesis.agg.RecordAggregator", false, this.getClass.getClassLoader )
-    } catch {
-        case ex: ClassNotFoundException =>
-            throw new ClassNotFoundException("The com.audienceproject:kinesis-writer library " +
-                "needs the KinesisAggregator .jar to be in the classpath. This dependency is not yet available " +
-                "in Maven and needs to be handled manually. See " +
-                "https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregator", ex)
-    }
-
     val logger: Logger = LogManager.getLogger( this.getClass.getName )
     logger.info(s"Using ${BuildInfo.name} version ${BuildInfo.version} build at ${BuildInfo.buildDate}")
 

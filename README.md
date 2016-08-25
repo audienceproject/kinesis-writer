@@ -65,3 +65,16 @@ If you use [Raygun](https://raygun.com/), you can have exceptions sent there
 
     PBScalaKinesisWriter.write("test-stream", it, client, raygun)
 ```
+
+## Known issues
+
+This project depends on some classes which are not available in Maven. The classes in question are part of the Kinesis Aggregation repository [https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregator](https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregator).
+If you try to use the `kinesis-writer` and get an error message like bellow, it means you are missing the _KinesisAggregator_ _.jar_ file. You can download a readily available _.jar_ from here [https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregator/dist](https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregator/dist). 
+
+```
+Error:scalac: missing or invalid dependency detected while loading class file 'PBScalaKinesisWriter.class'.
+Could not access term kinesis in package com.amazonaws,
+because it (or its dependencies) are missing. Check your build definition for
+missing or conflicting dependencies. (Re-run with `-Ylog-classpath` to see the problematic classpath.)
+A full rebuild may help if 'PBScalaKinesisWriter.class' was compiled against an incompatible version of com.amazonaws.
+```
