@@ -19,7 +19,7 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "1.0.2"
+version := "1.0.3"
 description := "A simple library for parsing command line arguments."
 
 scalaVersion := "2.11.8"
