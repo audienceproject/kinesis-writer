@@ -1,6 +1,9 @@
 // Run `sbt dependencyUpdates` if you want to see what dependencies can be updated
 // Run `sbt dependencyGraph` if you want to see the dependencies
 
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import com.typesafe.sbt._
 
 /**
@@ -46,18 +49,27 @@ libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.38"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.5"
 
-libraryDependencies += "org.apache.commons" % "commons-lang3" % "3.4"
+libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.typesafe" % "config" % "1.3.0"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.7.0"
 
-libraryDependencies ++= {
-    val awsVersion = "1.11.29"
-    Seq(
-        "com.amazonaws" % "aws-java-sdk-kinesis" % awsVersion
-    )
-}
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.29"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
+
+lazy val root = (project in file(".")).
+                enablePlugins(BuildInfoPlugin).
+                settings(
+                    buildInfoKeys := Seq[BuildInfoKey](
+                        name, version, scalaVersion, sbtVersion,
+                        BuildInfoKey.action("buildDate") {
+                            val date = new Date(System.currentTimeMillis)
+                            val df = new SimpleDateFormat("HH:mm:ss dd-MM-yyyy")
+                            df.format(date)
+                        }
+                    ),
+                    buildInfoPackage := "com.audienceproject"
+                )
 
 assemblyJarName in assembly := name.value + ".jar"
 
@@ -80,7 +92,7 @@ val publishSnapshot:Command = Command.command("publishSnapshot") { state =>
     val currentVersion = getOpt(version).get
     val newState =
         Command.process(s"""set version := "$currentVersion-SNAPSHOT" """, state)
-    val (s, _) = Project.extract(newState).runTask(PgpKeys.publishLocalSigned in Compile, newState)
+    val (s, _) = Project.extract(newState).runTask(PgpKeys.publishSigned in Compile, newState)
     state
 }
 commands ++= Seq(publishSnapshot)
@@ -107,13 +119,4 @@ pomExtra := (
             <organizationUrl>http://www.audienceproject.com</organizationUrl>
         </developer>
     </developers>
-    <distributionManagement>
-        <repository>
-            <id>oss.sonatype.org</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-        <snapshotRepository>
-            <id>oss.sonatype.org</id>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-    </distributionManagement>)
+)

@@ -3,16 +3,24 @@ package com.audienceproject.aws.kinesis
 import com.amazonaws.kinesis.agg.RecordAggregator
 import com.amazonaws.services.kinesis.model.LimitExceededException
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
+import com.audienceproject.BuildInfo
 import com.mindscapehq.raygun4java.core.RaygunClient
 import com.trueaccord.scalapb.GeneratedMessage
 import org.apache.commons.io.FileUtils
-import org.apache.commons.lang3.StringUtils
+import org.apache.commons.lang.StringUtils
 import org.apache.logging.log4j.{LogManager, Logger}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.util.Random
 
+/**
+  * This class can be used for writing aggregated Kinesis Stream Records to an Amazon Kinesis Stream.
+  * The Kinesis Stream Records are made of several User Records. This is a concept called aggregation in the context
+  * of Amazon Kinesis.
+  * This class only works with User Records that are Protocol Buffer based and their class is generated with the help
+  * of the ScalaPB sbt plugin (http://trueaccord.github.io/ScalaPB/).
+  */
 object PBScalaKinesisWriter {
 
     try {
@@ -25,27 +33,126 @@ object PBScalaKinesisWriter {
                 "https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregator", ex)
     }
 
-    private val logger: Logger = LogManager.getLogger( this.getClass.getName )
+    val logger: Logger = LogManager.getLogger( this.getClass.getName )
+    logger.info(s"Using ${BuildInfo.name} version ${BuildInfo.version} build at ${BuildInfo.buildDate}")
 
-    private val raygunClient: Option[RaygunClient] = None
-
-    private val maximumRetries = 30
+    /**
+      * The maximum number of linear back-off retries before giving up and throwing an exception
+      */
+    val maximumRetries = 30
 
     private val RANDOM = new Random(42)
 
     /**
-      * Send the items in an iterator to an Amazon Kinesis Stream. The items need to be protocol buffers encoded
-      * @param streamName The name of the Kinesis Stream on which to work
-      * @param it The iterator containing the data
-      * @param client The Amazon Kinesis client which retrives information about the Kinesis Stream.
+      * Send an iterator of Protocol Buffer encoded messages to Kinesis. It uses a default Kinesis client built
+      * using DefaultAWSCredentialsProviderChain and the default region.
+      *
+      * Example:
+      * {{{
+      * val it = List(
+      *     new PBMessage("now"),
+      *     new PBMessage("yesterday"),
+      *     new PBMessage("tomorrow")
+      * ).toIterator
+      *
+      * PBScalaKinesisWriter.write("test-stream", it)
+      * }}}
+      *
+      * @param streamName The name of the Kinesis Stream where the data should go to
+      * @param it The iterator containing Protocol Buffers messages
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis = new AmazonKinesisClient): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage]): Unit = {
+        val aggregator = new RecordAggregator
+        val client = new AmazonKinesisClient
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client))
+    }
+
+    /**
+      * Send an iterator of Protocol Buffer encoded messages to Kinesis.
+      *
+      * Example:
+      * {{{
+      * val it = List(
+      *     new PBMessage("now"),
+      *     new PBMessage("yesterday"),
+      *     new PBMessage("tomorrow")
+      * ).toIterator
+      *
+      * val client = new AmazonKinesisClient(new ProfileCredentialsProvider("my-custom-profile"))
+      *
+      * PBScalaKinesisWriter.write("test-stream", it, client)
+      * }}}
+      *
+      * @param streamName The name of the Kinesis Stream where the data should go to
+      * @param it The iterator containing Protocol Buffers messages
+      * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
+      */
+    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis): Unit = {
         val aggregator = new RecordAggregator
         write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client))
     }
 
+    /**
+      * Send an iterator of Protocol Buffer encoded messages to Kinesis. It uses a default Kinesis client built
+      * using DefaultAWSCredentialsProviderChain and the default region.
+      * It also uses a RaygunClient. Raygun is a 3rd party error logging service provider.
+      *
+      * Example:
+      * {{{
+      * val it = List(
+      *     new PBMessage("now"),
+      *     new PBMessage("yesterday"),
+      *     new PBMessage("tomorrow")
+      * ).toIterator
+      *
+      * val raygun = new RaygunClient("your-raygun-key")
+      *
+      * PBScalaKinesisWriter.write("test-stream", it, raygun)
+      * }}}
+      *
+      * @param streamName The name of the Kinesis Stream where the data should go to
+      * @param it The iterator containing Protocol Buffers messages
+      * @param raygun The Raygun client which sends exceptions
+      */
+    def write(streamName: String, it: Iterator[GeneratedMessage], raygun: RaygunClient): Unit = {
+        val aggregator = new RecordAggregator
+        val client = new AmazonKinesisClient
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygun)), Option(raygun))
+    }
+
+    /**
+      * Send an iterator of Protocol Buffer encoded messages to Kinesis.
+      * It also uses a RaygunClient. Raygun is a 3rd party error logging service provider.
+      *
+      * Example:
+      * {{{
+      * val it = List(
+      *     new PBMessage("now"),
+      *     new PBMessage("yesterday"),
+      *     new PBMessage("tomorrow")
+      * ).toIterator
+      *
+      * val client = new AmazonKinesisClient(new ProfileCredentialsProvider("my-custom-profile"))
+      *
+      * val raygun = new RaygunClient("your-raygun-key")
+      *
+      * PBScalaKinesisWriter.write("test-stream", it, client, raygun)
+      * }}}
+      *
+      * @param streamName The name of the Kinesis Stream where the data should go to
+      * @param it The iterator containing Protocol Buffers messages
+      * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
+      * @param raygun The Raygun client which sends exceptions
+      */
+    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygun: RaygunClient): Unit = {
+        val aggregator = new RecordAggregator
+        val client = new AmazonKinesisClient
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygun)), Option(raygun))
+    }
+
     @tailrec
-    final private def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String, it: Iterator[GeneratedMessage], ehk: String): Unit = {
+    private final def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String,
+                    it: Iterator[GeneratedMessage], ehk: String, raygunClient: Option[RaygunClient] = None): Unit = {
         if (it.hasNext) {
             val aggRecord = aggregator.addUserRecord(
                 "a",
@@ -56,13 +163,14 @@ object PBScalaKinesisWriter {
                 logger.info(s"Sending ${aggRecord.getNumUserRecords} user records of a size of "
                               + s" ${FileUtils.byteCountToDisplaySize(aggRecord.getSizeBytes)}.")
                 val newEhk = getExplicitHashKey(streamName, client)
+                val putRecordRequest = aggRecord.toPutRecordRequest(streamName)
                 var sent = false
                 // Needs to be set via a configuration variable
                 var failCount = 0
                 do {
                     try {
-                        val response = client.putRecord(aggRecord.toPutRecordRequest(streamName))
-                        logger.info(s"Wrote to shard ${response.getShardId}")
+                        val response = client.putRecord(putRecordRequest)
+                        logger.info(s"Wrote ${aggRecord.getNumUserRecords} user records to shard ${response.getShardId}")
                         sent = true
                     } catch {
                         // Linear back-off mechanism
@@ -71,30 +179,32 @@ object PBScalaKinesisWriter {
                             if (failCount > maximumRetries ) {
                                 val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
                                 logger.error(finalEx)
-                                raygunClient.map(_.Send(finalEx, List("streaming")))
+                                raygunClient.map(_.Send(finalEx, List("kinesis")))
                                 throw finalEx
                             }
-                            logger.error(ex.getMessage, ex)
+                            logger.warn(ex.getMessage)
                             logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
                             Thread.sleep((failCount + 1) * 2000 )
                             failCount = failCount + 1
                         case ex: Throwable =>
-                            raygunClient.map(_.Send(ex, List("streaming")))
+                            raygunClient.map(_.Send(ex, List("kinesis")))
                             logger.error(ex.getMessage, ex)
                             throw ex
                     }
                 } while (!sent)
-                write(aggregator, client, streamName, it, newEhk)
+                write(aggregator, client, streamName, it, newEhk, raygunClient)
             } else {
-                write(aggregator, client, streamName, it, ehk)
+                write(aggregator, client, streamName, it, ehk, raygunClient)
             }
         } else {
             val finalRecord = aggregator.clearAndGet
+            val putRecordRequest = finalRecord.toPutRecordRequest(streamName)
             var failCount = 0
             var sent = false
             do {
                 try {
-                    client.putRecord(finalRecord.toPutRecordRequest(streamName))
+                    val response = client.putRecord(putRecordRequest)
+                    logger.info(s"Wrote last bits and pieces to shard ${response.getShardId}")
                     sent = true
                 } catch {
                     // Linear back-off mechanism
@@ -103,15 +213,15 @@ object PBScalaKinesisWriter {
                         if (failCount > maximumRetries ) {
                             val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
                             logger.error(finalEx)
-                            raygunClient.map(_.Send(finalEx, List("streaming")))
+                            raygunClient.map(_.Send(finalEx, List("kinesis")))
                             throw finalEx
                         }
-                        logger.error(ex.getMessage, ex)
+                        logger.warn(ex.getMessage)
                         logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
                         Thread.sleep((failCount + 1) * 2000 )
                         failCount = failCount + 1
                     case ex: Throwable =>
-                        raygunClient.map(_.Send(ex, List("streaming")))
+                        raygunClient.map(_.Send(ex, List("kinesis")))
                         logger.error(ex.getMessage, ex)
                         throw ex
                 }
@@ -120,7 +230,7 @@ object PBScalaKinesisWriter {
     }
 
     @tailrec
-    final private def getExplicitHashKey(streamName: String, client: AmazonKinesis = new AmazonKinesisClient, failCount: Int = 0) : String = {
+    private final def getExplicitHashKey(streamName: String, client: AmazonKinesis = new AmazonKinesisClient, failCount: Int = 0, raygun: Option[RaygunClient] = None) : String = {
         // The spaces are there so that the printed logs are easier to read.
         logger.debug("       Shard        |                  Start                 |                  End                   |                  Middle")
         // Get shard information again in case the stream was repartitioned
@@ -141,15 +251,15 @@ object PBScalaKinesisWriter {
                 if (failCount > maximumRetries ) {
                     val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
                     logger.error(finalEx)
-                    raygunClient.map(_.Send(finalEx, List("streaming")))
+                    raygun.map(_.Send(finalEx, List("kinesis")))
                     throw finalEx
                 }
-                logger.error(ex.getMessage, ex)
+                logger.warn(ex.getMessage)
                 logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
                 Thread.sleep((failCount + 1) * 2000 )
-                getExplicitHashKey(streamName, client, failCount + 1)
+                getExplicitHashKey(streamName, client, failCount + 1, raygun)
             case ex: Throwable =>
-                raygunClient.map(_.Send(ex, List("streaming")))
+                raygun.map(_.Send(ex, List("kinesis")))
                 logger.error(ex.getMessage, ex)
                 throw ex
         }
