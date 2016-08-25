@@ -1,7 +1,7 @@
 package com.audienceproject.aws.kinesis
 
 import com.amazonaws.kinesis.agg.RecordAggregator
-import com.amazonaws.services.kinesis.model.LimitExceededException
+import com.amazonaws.services.kinesis.model.{LimitExceededException, ProvisionedThroughputExceededException}
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
 import com.audienceproject.BuildInfo
 import com.mindscapehq.raygun4java.core.RaygunClient
@@ -176,6 +176,18 @@ object PBScalaKinesisWriter {
                             logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
                             Thread.sleep((failCount + 1) * 2000 )
                             failCount = failCount + 1
+                        case ex: ProvisionedThroughputExceededException =>
+                            // This should be a configuration
+                            if (failCount > maximumRetries ) {
+                                val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
+                                logger.error(finalEx)
+                                raygunClient.map(_.Send(finalEx, List("kinesis")))
+                                throw finalEx
+                            }
+                            logger.warn(ex.getMessage)
+                            logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
+                            Thread.sleep((failCount + 1) * 2000 )
+                            failCount = failCount + 1
                         case ex: Throwable =>
                             raygunClient.map(_.Send(ex, List("kinesis")))
                             logger.error(ex.getMessage, ex)
@@ -199,6 +211,18 @@ object PBScalaKinesisWriter {
                 } catch {
                     // Linear back-off mechanism
                     case ex: LimitExceededException =>
+                        // This should be a configuration
+                        if (failCount > maximumRetries ) {
+                            val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
+                            logger.error(finalEx)
+                            raygunClient.map(_.Send(finalEx, List("kinesis")))
+                            throw finalEx
+                        }
+                        logger.warn(ex.getMessage)
+                        logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
+                        Thread.sleep((failCount + 1) * 2000 )
+                        failCount = failCount + 1
+                    case ex: ProvisionedThroughputExceededException =>
                         // This should be a configuration
                         if (failCount > maximumRetries ) {
                             val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
@@ -237,6 +261,18 @@ object PBScalaKinesisWriter {
         } catch {
             // Linear back-off mechanism
             case ex: LimitExceededException =>
+                // This should be a configuration
+                if (failCount > maximumRetries ) {
+                    val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
+                    logger.error(finalEx)
+                    raygun.map(_.Send(finalEx, List("kinesis")))
+                    throw finalEx
+                }
+                logger.warn(ex.getMessage)
+                logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
+                Thread.sleep((failCount + 1) * 2000 )
+                getExplicitHashKey(streamName, client, failCount + 1, raygun)
+            case ex: ProvisionedThroughputExceededException =>
                 // This should be a configuration
                 if (failCount > maximumRetries ) {
                     val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
