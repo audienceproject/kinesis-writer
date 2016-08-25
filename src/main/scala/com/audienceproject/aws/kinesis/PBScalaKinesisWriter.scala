@@ -24,7 +24,7 @@ import scala.util.Random
 object PBScalaKinesisWriter {
 
     val logger: Logger = LogManager.getLogger( this.getClass.getName )
-    logger.info(s"Using ${BuildInfo.name} version ${BuildInfo.version} build at ${BuildInfo.buildDate}")
+    logger.info(s"Using ${BuildInfo.name} version ${BuildInfo.version} built at ${BuildInfo.buildDate}")
 
     /**
       * The maximum number of linear back-off retries before giving up and throwing an exception
