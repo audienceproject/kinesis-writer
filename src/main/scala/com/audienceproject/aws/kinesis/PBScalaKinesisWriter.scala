@@ -164,18 +164,6 @@ object PBScalaKinesisWriter {
                         sent = true
                     } catch {
                         // Linear back-off mechanism
-                        case ex: LimitExceededException =>
-                            // This should be a configuration
-                            if (failCount > maximumRetries ) {
-                                val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                                logger.error(finalEx)
-                                raygunClient.map(_.Send(finalEx, List("kinesis")))
-                                throw finalEx
-                            }
-                            logger.warn(ex.getMessage)
-                            logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                            Thread.sleep((failCount + 1) * 2000 )
-                            failCount = failCount + 1
                         case ex: ProvisionedThroughputExceededException =>
                             // This should be a configuration
                             if (failCount > maximumRetries ) {
@@ -210,18 +198,6 @@ object PBScalaKinesisWriter {
                     sent = true
                 } catch {
                     // Linear back-off mechanism
-                    case ex: LimitExceededException =>
-                        // This should be a configuration
-                        if (failCount > maximumRetries ) {
-                            val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                            logger.error(finalEx)
-                            raygunClient.map(_.Send(finalEx, List("kinesis")))
-                            throw finalEx
-                        }
-                        logger.warn(ex.getMessage)
-                        logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                        Thread.sleep((failCount + 1) * 2000 )
-                        failCount = failCount + 1
                     case ex: ProvisionedThroughputExceededException =>
                         // This should be a configuration
                         if (failCount > maximumRetries ) {
@@ -261,18 +237,6 @@ object PBScalaKinesisWriter {
         } catch {
             // Linear back-off mechanism
             case ex: LimitExceededException =>
-                // This should be a configuration
-                if (failCount > maximumRetries ) {
-                    val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                    logger.error(finalEx)
-                    raygun.map(_.Send(finalEx, List("kinesis")))
-                    throw finalEx
-                }
-                logger.warn(ex.getMessage)
-                logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                Thread.sleep((failCount + 1) * 2000 )
-                getExplicitHashKey(streamName, client, failCount + 1, raygun)
-            case ex: ProvisionedThroughputExceededException =>
                 // This should be a configuration
                 if (failCount > maximumRetries ) {
                     val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
