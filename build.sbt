@@ -4,8 +4,6 @@
 import java.text.SimpleDateFormat
 import java.util.Date
 
-import com.typesafe.sbt._
-
 /**
   * The groupId in Maven
   */
