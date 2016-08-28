@@ -136,7 +136,6 @@ object PBScalaKinesisWriter {
       */
     def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygun: RaygunClient): Unit = {
         val aggregator = new RecordAggregator
-        val client = new AmazonKinesisClient
         write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygun)), Option(raygun))
     }
 
