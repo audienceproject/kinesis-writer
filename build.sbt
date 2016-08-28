@@ -17,8 +17,8 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "1.0.4"
-description := "A simple library for parsing command line arguments."
+version := "1.0.5"
+description := "Helper class for writing Protocol Buffer messages to Amazon Kinesis streams with the maximum throughput possible."
 
 scalaVersion := "2.11.8"
 
