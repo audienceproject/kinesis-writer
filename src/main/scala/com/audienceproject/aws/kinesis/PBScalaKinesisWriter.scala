@@ -187,34 +187,36 @@ object PBScalaKinesisWriter {
             }
         } else {
             val finalRecord = aggregator.clearAndGet
-            val putRecordRequest = finalRecord.toPutRecordRequest(streamName)
-            var failCount = 0
-            var sent = false
-            do {
-                try {
-                    val response = client.putRecord(putRecordRequest)
-                    logger.info(s"Wrote last bits and pieces to shard ${response.getShardId}")
-                    sent = true
-                } catch {
-                    // Linear back-off mechanism
-                    case ex: ProvisionedThroughputExceededException =>
-                        // This should be a configuration
-                        if (failCount > maximumRetries ) {
-                            val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                            logger.error(finalEx)
-                            raygunClient.map(_.Send(finalEx, List("kinesis")))
-                            throw finalEx
-                        }
-                        logger.warn(ex.getMessage)
-                        logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                        Thread.sleep((failCount + 1) * 2000 )
-                        failCount = failCount + 1
-                    case ex: Throwable =>
-                        raygunClient.map(_.Send(ex, List("kinesis")))
-                        logger.error(ex.getMessage, ex)
-                        throw ex
-                }
-            } while (!sent)
+            if ( finalRecord != null ) {
+                val putRecordRequest = finalRecord.toPutRecordRequest(streamName)
+                var failCount = 0
+                var sent = false
+                do {
+                    try {
+                        val response = client.putRecord(putRecordRequest)
+                        logger.info(s"Wrote last bits and pieces to shard ${response.getShardId}")
+                        sent = true
+                    } catch {
+                        // Linear back-off mechanism
+                        case ex: ProvisionedThroughputExceededException =>
+                            // This should be a configuration
+                            if (failCount > maximumRetries ) {
+                                val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
+                                logger.error(finalEx)
+                                raygunClient.map(_.Send(finalEx, List("kinesis")))
+                                throw finalEx
+                            }
+                            logger.warn(ex.getMessage)
+                            logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
+                            Thread.sleep((failCount + 1) * 2000 )
+                            failCount = failCount + 1
+                        case ex: Throwable =>
+                            raygunClient.map(_.Send(ex, List("kinesis")))
+                            logger.error(ex.getMessage, ex)
+                            throw ex
+                    }
+                } while (!sent)
+            }
         }
     }
 
