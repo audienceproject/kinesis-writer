@@ -6,15 +6,11 @@ box:
 
 build:
     steps:
-        - script:
-            name: Clean everything
-            code: |
-                sbt clean
+
         - script:
             name: Compile
             code: |
-                sbt compile dependencyUpdates
-        # Clean stuff
+                sbt clean compile dependencyUpdates
         - script:
             name: Clean again
             code: |
