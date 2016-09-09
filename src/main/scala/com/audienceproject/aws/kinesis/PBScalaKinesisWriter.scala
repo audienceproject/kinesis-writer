@@ -232,9 +232,16 @@ object PBScalaKinesisWriter {
                 logger.debug(s"${shard.getShardId}|${StringUtils.leftPad(range.getStartingHashKey, 40, " ")}|${StringUtils.leftPad(range.getEndingHashKey, 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
                 middle.toString
             } ).toArray
-            val randomShard = RANDOM.nextInt(ehks.length)
-            logger.info(s"Records going to shard $randomShard")
-            ehks(randomShard)
+            if ( ehks.length > 0 ) {
+                val randomShard = RANDOM.nextInt(ehks.length)
+                logger.info(s"Records going to shard $randomShard")
+                ehks(randomShard)
+            } else {
+                logger.warn("The stream appears to have 0 shards. This is not good.")
+                logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
+                Thread.sleep((failCount + 1) * 2000 )
+                getExplicitHashKey(streamName, client, failCount + 1, raygun)
+            }
         } catch {
             // Linear back-off mechanism
             case ex: LimitExceededException =>
