@@ -1,0 +1,21 @@
+box:
+    id: audienceproject/jvm
+    username: $DOCKERHUB_ACCOUNT
+    password: $DOCKERHUB_PASSWORD
+    tag: latest
+
+build:
+    steps:
+        - script:
+            name: Clean everything
+            code: |
+                sbt clean
+        - script:
+            name: Compile
+            code: |
+                sbt compile dependencyUpdates
+        # Clean stuff
+        - script:
+            name: Clean again
+            code: |
+                sbt clean
