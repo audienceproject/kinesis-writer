@@ -1,5 +1,6 @@
 package com.audienceproject.aws.kinesis
 
+import com.amazonaws.AmazonClientException
 import com.amazonaws.kinesis.agg.RecordAggregator
 import com.amazonaws.services.kinesis.model.{LimitExceededException, ProvisionedThroughputExceededException}
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
@@ -95,19 +96,19 @@ object PBScalaKinesisWriter {
       *     new PBMessage("tomorrow")
       * ).toIterator
       *
-      * val raygun = new RaygunClient("your-raygun-key")
+      * val raygunClient = new RaygunClient("your-raygunClient-key")
       *
-      * PBScalaKinesisWriter.write("test-stream", it, raygun)
+      * PBScalaKinesisWriter.write("test-stream", it, raygunClient)
       * }}}
       *
       * @param streamName The name of the Kinesis Stream where the data should go to
       * @param it The iterator containing Protocol Buffers messages
-      * @param raygun The Raygun client which sends exceptions
+      * @param raygunClient The Raygun client which sends exceptions
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage], raygun: RaygunClient): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage], raygunClient: RaygunClient): Unit = {
         val aggregator = new RecordAggregator
         val client = new AmazonKinesisClient
-        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygun)), Option(raygun))
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygunClient)), Option(raygunClient))
     }
 
     /**
@@ -124,19 +125,19 @@ object PBScalaKinesisWriter {
       *
       * val client = new AmazonKinesisClient(new ProfileCredentialsProvider("my-custom-profile"))
       *
-      * val raygun = new RaygunClient("your-raygun-key")
+      * val raygunClient = new RaygunClient("your-raygunClient-key")
       *
-      * PBScalaKinesisWriter.write("test-stream", it, client, raygun)
+      * PBScalaKinesisWriter.write("test-stream", it, client, raygunClient)
       * }}}
       *
       * @param streamName The name of the Kinesis Stream where the data should go to
       * @param it The iterator containing Protocol Buffers messages
       * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
-      * @param raygun The Raygun client which sends exceptions
+      * @param raygunClient The Raygun client which sends exceptions
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygun: RaygunClient): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygunClient: RaygunClient): Unit = {
         val aggregator = new RecordAggregator
-        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygun)), Option(raygun))
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygunClient)), Option(raygunClient))
     }
 
     @tailrec
@@ -163,18 +164,7 @@ object PBScalaKinesisWriter {
                         sent = true
                     } catch {
                         // Linear back-off mechanism
-                        case ex: ProvisionedThroughputExceededException =>
-                            // This should be a configuration
-                            if (failCount > maximumRetries ) {
-                                val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                                logger.error(finalEx)
-                                if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis"))
-                                throw finalEx
-                            }
-                            logger.warn(ex.getMessage)
-                            logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                            Thread.sleep((failCount + 1) * 2000 )
-                            failCount = failCount + 1
+                        case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount, raygunClient)
                         case ex: Throwable =>
                             if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis"))
                             logger.error(ex.getMessage, ex)
@@ -198,18 +188,7 @@ object PBScalaKinesisWriter {
                         sent = true
                     } catch {
                         // Linear back-off mechanism
-                        case ex: ProvisionedThroughputExceededException =>
-                            // This should be a configuration
-                            if (failCount > maximumRetries ) {
-                                val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                                logger.error(finalEx)
-                                if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis"))
-                                throw finalEx
-                            }
-                            logger.warn(ex.getMessage)
-                            logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                            Thread.sleep((failCount + 1) * 2000 )
-                            failCount = failCount + 1
+                        case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount, raygunClient)
                         case ex: Throwable =>
                             if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis"))
                             logger.error(ex.getMessage, ex)
@@ -221,7 +200,7 @@ object PBScalaKinesisWriter {
     }
 
     @tailrec
-    private final def getExplicitHashKey(streamName: String, client: AmazonKinesis = new AmazonKinesisClient, failCount: Int = 0, raygun: Option[RaygunClient] = None) : String = {
+    private final def getExplicitHashKey(streamName: String, client: AmazonKinesis = new AmazonKinesisClient, failCount: Int = 0, raygunClient: Option[RaygunClient] = None) : String = {
         // The spaces are there so that the printed logs are easier to read.
         logger.debug("       Shard        |                  Start                 |                  End                   |                  Middle")
         // Get shard information again in case the stream was repartitioned
@@ -237,35 +216,28 @@ object PBScalaKinesisWriter {
             ehks(randomShard)
         } catch {
             // Linear back-off mechanism
-            case ex: LimitExceededException =>
-                // This should be a configuration
-                if (failCount > maximumRetries ) {
-                    val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                    logger.error(finalEx)
-                    if (raygun.isDefined) raygun.get.Send(ex, List("kinesis"))
-                    throw finalEx
-                }
-                logger.warn(ex.getMessage)
-                logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                Thread.sleep((failCount + 1) * 2000 )
-                getExplicitHashKey(streamName, client, failCount + 1, raygun)
-            case ex: IllegalArgumentException =>
-                // This should be a configuration
-                if (failCount > maximumRetries ) {
-                    val finalEx = new LimitExceededException(s"Linear back-off failed after $failCount retries. Giving up.")
-                    logger.error(finalEx)
-                    if (raygun.isDefined) raygun.get.Send(ex, List("kinesis"))
-                    throw finalEx
-                }
-                logger.warn(ex.getMessage)
-                logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
-                Thread.sleep((failCount + 1) * 2000 )
-                getExplicitHashKey(streamName, client, failCount + 1, raygun)
+            case ex: LimitExceededException => getExplicitHashKey(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
+            case ex: IllegalArgumentException => getExplicitHashKey(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
+            case ex: AmazonClientException => getExplicitHashKey(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
             case ex: Throwable =>
-                if (raygun.isDefined) raygun.get.Send(ex, List("kinesis"))
+                if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis"))
                 logger.error(ex.getMessage, ex)
                 throw ex
         }
+    }
+
+    private def retryLogic(ex: Throwable, failCount: Int, raygunClient: Option[RaygunClient]): Int = {
+        // This should be a configuration
+        if (failCount > maximumRetries ) {
+            val finalEx = new Exception(s"Linear back-off failed after $failCount retries. Giving up.")
+            logger.error(finalEx)
+            if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis"))
+            throw ex
+        }
+        logger.warn(ex.getMessage)
+        logger.warn(s"Linear back-off activated. Sleeping ${(failCount + 1) * 2} seconds.")
+        Thread.sleep((failCount + 1) * 2000 )
+        failCount
     }
 
 }
