@@ -184,7 +184,7 @@ object PBScalaKinesisWriter {
                 do {
                     try {
                         val response = client.putRecord(putRecordRequest)
-                        logger.info(s"Wrote last bits and pieces to shard ${response.getShardId}")
+                        logger.info(s"Wrote last ${finalRecord.getNumUserRecords} user records to shard ${response.getShardId}")
                         sent = true
                     } catch {
                         // Linear back-off mechanism
