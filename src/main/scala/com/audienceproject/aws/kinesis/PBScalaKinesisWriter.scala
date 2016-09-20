@@ -212,7 +212,7 @@ object PBScalaKinesisWriter {
                 middle.toString
             } ).toArray
             val randomShard = RANDOM.nextInt(ehks.length)
-            logger.info(s"Records going to shard $randomShard")
+            logger.info(s"Records going to shard $randomShard of $streamName")
             ehks(randomShard)
         } catch {
             // Linear back-off mechanism
