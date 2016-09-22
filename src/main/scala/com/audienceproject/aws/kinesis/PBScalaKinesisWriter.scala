@@ -52,10 +52,10 @@ object PBScalaKinesisWriter {
       * @param streamName The name of the Kinesis Stream where the data should go to
       * @param it The iterator containing Protocol Buffers messages
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage]): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage]): Int = {
         val aggregator = new RecordAggregator
         val client = new AmazonKinesisClient
-        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client))
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client), None, 0)
     }
 
     /**
@@ -78,9 +78,9 @@ object PBScalaKinesisWriter {
       * @param it The iterator containing Protocol Buffers messages
       * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis): Int = {
         val aggregator = new RecordAggregator
-        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client))
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client), None, 0)
     }
 
     /**
@@ -105,10 +105,10 @@ object PBScalaKinesisWriter {
       * @param it The iterator containing Protocol Buffers messages
       * @param raygunClient The Raygun client which sends exceptions
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage], raygunClient: RaygunClient): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage], raygunClient: RaygunClient): Int = {
         val aggregator = new RecordAggregator
         val client = new AmazonKinesisClient
-        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygunClient)), Option(raygunClient))
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygunClient)), Option(raygunClient), 0)
     }
 
     /**
@@ -135,14 +135,14 @@ object PBScalaKinesisWriter {
       * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
       * @param raygunClient The Raygun client which sends exceptions
       */
-    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygunClient: RaygunClient): Unit = {
+    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygunClient: RaygunClient): Int = {
         val aggregator = new RecordAggregator
-        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygunClient)), Option(raygunClient))
+        write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client, 0, Option(raygunClient)), Option(raygunClient), 0)
     }
 
     @tailrec
     private final def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String,
-                    it: Iterator[GeneratedMessage], ehk: String, raygunClient: Option[RaygunClient] = None): Unit = {
+                    it: Iterator[GeneratedMessage], ehk: String, raygunClient: Option[RaygunClient] = None, count: Int): Int = {
         if (it.hasNext) {
             val aggRecord = aggregator.addUserRecord(
                 "a",
@@ -171,9 +171,9 @@ object PBScalaKinesisWriter {
                             throw ex
                     }
                 } while (!sent)
-                write(aggregator, client, streamName, it, newEhk, raygunClient)
+                write(aggregator, client, streamName, it, newEhk, raygunClient, count + aggRecord.getNumUserRecords)
             } else {
-                write(aggregator, client, streamName, it, ehk, raygunClient)
+                write(aggregator, client, streamName, it, ehk, raygunClient, count)
             }
         } else {
             val finalRecord = aggregator.clearAndGet
@@ -195,6 +195,9 @@ object PBScalaKinesisWriter {
                             throw ex
                     }
                 } while (!sent)
+                count + finalRecord.getNumUserRecords
+            } else {
+                count
             }
         }
     }
