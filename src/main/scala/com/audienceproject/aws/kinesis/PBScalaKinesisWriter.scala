@@ -1,7 +1,7 @@
 package com.audienceproject.aws.kinesis
 
 import com.amazonaws.AmazonClientException
-import com.amazonaws.kinesis.agg.RecordAggregator
+import com.amazonaws.kinesis.agg.{AggRecord, RecordAggregator}
 import com.amazonaws.services.kinesis.model.{LimitExceededException, ProvisionedThroughputExceededException}
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
 import com.audienceproject.BuildInfo
@@ -31,6 +31,17 @@ object PBScalaKinesisWriter {
       * The maximum number of linear back-off retries before giving up and throwing an exception
       */
     val maximumRetries = 30
+
+    /**
+      * The maximum size in bytes of the last User Record that we can add to the Stream Record.
+      * This is very empiric becuase we don't have access to the size function of the aggregated record.
+      */
+    val maximumLastSize = 100000
+
+    /**
+      * The maximum size of the aggregated record in bytes before the last record is added. Look above for explanation.
+      */
+    val maximumSize = 1000000
 
     private val RANDOM = new Random(42)
 
@@ -144,15 +155,41 @@ object PBScalaKinesisWriter {
     private final def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String,
                     it: Iterator[GeneratedMessage], ehk: String, raygunClient: Option[RaygunClient] = None, count: Int): Int = {
         if (it.hasNext) {
-            val aggRecord = aggregator.addUserRecord(
-                "a",
-                ehk,
-                it.next.toByteArray
-            )
+            val message = it.next.toByteArray
+            // Some convoluted logic to make sure the aggregated record is not too large
+            val aggRecord = if(aggregator.getSizeBytes >= maximumSize) {
+                if (message.length > maximumLastSize ) {
+                    val aggR = aggregator.clearAndGet
+                    aggregator.addUserRecord(
+                        "a",
+                        ehk,
+                        message
+                    )
+                    aggR
+                } else {
+                    aggregator.addUserRecord(
+                        "a",
+                        ehk,
+                        message
+                    ) match {
+                        case aggR: AggRecord =>
+                            // This should not actually happend
+                            logger.warn("A full aggregated was retruned when one was not expected")
+                            if (raygunClient.isDefined) raygunClient.get.Send(new Exception("A full aggregated was retruned when one was not expected"), List("kinesis"))
+                            aggR
+                        case _ => aggregator.clearAndGet
+                    }
+                }
+            } else {
+                aggregator.addUserRecord(
+                    "a",
+                    ehk,
+                    message
+                )
+            }
             if (aggRecord != null) {
                 logger.info(s"Sending ${aggRecord.getNumUserRecords} user records of a size of "
                               + s" ${FileUtils.byteCountToDisplaySize(aggRecord.getSizeBytes)}.")
-                val newEhk = getExplicitHashKey(streamName, client)
                 val putRecordRequest = aggRecord.toPutRecordRequest(streamName)
                 var sent = false
                 // Needs to be set via a configuration variable
@@ -171,7 +208,7 @@ object PBScalaKinesisWriter {
                             throw ex
                     }
                 } while (!sent)
-                write(aggregator, client, streamName, it, newEhk, raygunClient, count + aggRecord.getNumUserRecords)
+                write(aggregator, client, streamName, it, getExplicitHashKey(streamName, client), raygunClient, count + aggRecord.getNumUserRecords)
             } else {
                 write(aggregator, client, streamName, it, ehk, raygunClient, count)
             }
