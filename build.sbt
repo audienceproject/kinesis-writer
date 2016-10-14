@@ -28,7 +28,7 @@ scalaVersion := "2.11.8"
 crossScalaVersions := Seq("2.10.6", "2.11.8")
 
 libraryDependencies ++= {
-    val log4j2Version = "2.6.2"
+    val log4j2Version = "2.7"
     Seq(
         "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
         "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
@@ -38,12 +38,12 @@ libraryDependencies ++= {
 
 libraryDependencies ++= {
     Seq(
-        "com.mindscapehq" % "core" % "2.1.0",
+        "com.mindscapehq" % "core" % "2.1.1",
         "com.mindscapehq.raygun4java" % "core" % "1.0.2"
     )
 }
 
-libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.38"
+libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.43"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.5"
 
@@ -51,7 +51,7 @@ libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
 libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.7.0"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.29"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.43"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
