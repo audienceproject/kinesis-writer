@@ -17,50 +17,17 @@ build:
 
 publish-snapshot:
     steps:
-        - script:
-            name: Publish to Sonatype
-            code: |
-                mkdir -p ~/.sbt/0.13/
-                touch ~/.sbt/0.13/sonatype.sbt
-                echo 'credentials += Credentials("Sonatype Nexus Repository Manager",' >> ~/.sbt/0.13/sonatype.sbt
-                echo '        "oss.sonatype.org",' >> ~/.sbt/0.13/sonatype.sbt
-                echo '        "'$WERCKER_SBT_TO_MAVEN_CENTRAL_USER'",' >> ~/.sbt/0.13/sonatype.sbt
-                echo '        "'$WERCKER_SBT_TO_MAVEN_CENTRAL_PASS'")' >> ~/.sbt/0.13/sonatype.sbt
-
-                mkdir -p ~/.sbt/gpg/
-                touch ~/.sbt/gpg/secring.asc
-                echo $WERCKER_SBT_TO_MAVEN_CENTRAL_SECURE_RING > ~/.sbt/gpg/secring.asc
-
-                mkdir -p ~/.sbt/0.13/plugins/
-                touch ~/.sbt/0.13/plugins/plugins.sbt
-                echo 'addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "1.1")' >> ~/.sbt/0.13/plugins/plugins.sbt
-                echo '' >> ~/.sbt/0.13/plugins/plugins.sbt
-                echo 'addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")' >> ~/.sbt/0.13/plugins/plugins.sbt
-        - script:
-            name: Publish to Sonatype
-            code: |
-                echo "$WERCKER_SBT_TO_MAVEN_CENTRAL_PHRASE" | sbt +publishLocalSigned
+        - audienceproject/sbt-to-maven-central@1.0.0:
+            user: $NEXUS_USER
+            password: $NEXUS_PASSWORD
+            private-key: $NEXUS_PK
+            passphrase: $NEXUS_PASSPHRASE
 
 publish-release:
     steps:
-        - script:
-            name: Publish to Sonatype
-            code: |
-                mkdir -p ~/.sbt/0.13/
-                touch ~/.sbt/0.13/sonatype.sbt
-                echo 'credentials += Credentials("Sonatype Nexus Repository Manager",' >> ~/.sbt/0.13/sonatype.sbt
-                echo '        "oss.sonatype.org",' >> ~/.sbt/0.13/sonatype.sbt
-                echo '        "'$WERCKER_SBT_TO_MAVEN_CENTRAL_USER'",' >> ~/.sbt/0.13/sonatype.sbt
-                echo '        "'$WERCKER_SBT_TO_MAVEN_CENTRAL_PASS'")' >> ~/.sbt/0.13/sonatype.sbt
-
-                mkdir -p ~/.sbt/gpg/
-                touch ~/.sbt/gpg/secring.asc
-                echo $WERCKER_SBT_TO_MAVEN_CENTRAL_SECURE_RING | base64 > ~/.sbt/gpg/secring.asc
-
-                mkdir -p ~/.sbt/0.13/plugins/
-                touch ~/.sbt/0.13/plugins/plugins.sbt
-                echo 'addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "1.1")' >> ~/.sbt/0.13/plugins/plugins.sbt
-                echo '' >> ~/.sbt/0.13/plugins/plugins.sbt
-                echo 'addSbtPlugin("com.jsuereth" % "sbt-pgp" % "1.0.0")' >> ~/.sbt/0.13/plugins/plugins.sbt
-
-                echo "$WERCKER_SBT_TO_MAVEN_CENTRAL_PHRASE" | sbt +publishSigned
+        - audienceproject/sbt-to-maven-central@1.0.0:
+            user: $NEXUS_USER
+            password: $NEXUS_PASSWORD
+            private-key: $NEXUS_PK
+            passphrase: $NEXUS_PASSPHRASE
+            destination: RELEASE
