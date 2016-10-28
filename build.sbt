@@ -51,7 +51,7 @@ libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
 libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.7.0"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.43"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.48"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
