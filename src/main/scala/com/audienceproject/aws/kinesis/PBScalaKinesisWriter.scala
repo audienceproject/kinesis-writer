@@ -206,10 +206,7 @@ object PBScalaKinesisWriter {
                     } catch {
                         // Linear back-off mechanism
                         case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount, raygunClient)
-                        case ex: Throwable =>
-                            if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis-writer"))
-                            logger.error(ex.getMessage, ex)
-                            throw ex
+                        case ex: Throwable => failCount = retryLogic(ex, failCount, raygunClient)
                     }
                 } while (!sent)
                 write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), raygunClient, count + aggRecord.getNumUserRecords)
@@ -230,10 +227,7 @@ object PBScalaKinesisWriter {
                     } catch {
                         // Linear back-off mechanism
                         case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount, raygunClient)
-                        case ex: Throwable =>
-                            if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis-writer"))
-                            logger.error(ex.getMessage, ex)
-                            throw ex
+                        case ex: Throwable => failCount = retryLogic(ex, failCount, raygunClient)
                     }
                 } while (!sent)
                 count + finalRecord.getNumUserRecords
@@ -265,10 +259,7 @@ object PBScalaKinesisWriter {
             case ex: LimitExceededException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
             case ex: IllegalArgumentException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
             case ex: AmazonClientException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
-            case ex: Throwable =>
-                if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis-writer"))
-                logger.error(ex.getMessage, ex)
-                throw ex
+            case ex: Throwable => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
         }
     }
 

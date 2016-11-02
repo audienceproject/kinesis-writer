@@ -6,7 +6,6 @@ box:
 
 build:
     steps:
-
         - script:
             name: Compile
             code: |
@@ -15,3 +14,20 @@ build:
             name: Clean again
             code: |
                 sbt clean
+
+publish-snapshot:
+    steps:
+        - audienceproject/sbt-to-maven-central@1.0.1:
+            user: $NEXUS_USER
+            password: $NEXUS_PASSWORD
+            private-key: $NEXUS_PK
+            passphrase: $NEXUS_PASSPHRASE
+
+publish-release:
+    steps:
+        - audienceproject/sbt-to-maven-central@1.0.1:
+            user: $NEXUS_USER
+            password: $NEXUS_PASSWORD
+            private-key: $NEXUS_PK
+            passphrase: $NEXUS_PASSPHRASE
+            destination: RELEASE
