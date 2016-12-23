@@ -17,15 +17,15 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "1.0.14"
+version := "1.1.0"
 description := "Helper class for writing Protocol Buffer messages to Amazon Kinesis streams with the maximum throughput possible."
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.1"
 
 /**
   * Additional scala version supported.
   */
-crossScalaVersions := Seq("2.10.6", "2.11.8")
+crossScalaVersions := Seq("2.10.6", "2.11.8", "2.12.1")
 
 libraryDependencies ++= {
     val log4j2Version = "2.7"
@@ -38,20 +38,20 @@ libraryDependencies ++= {
 
 libraryDependencies ++= {
     Seq(
-        "com.mindscapehq" % "core" % "2.1.1",
+        "com.mindscapehq" % "core" % "2.2.0",
         "com.mindscapehq.raygun4java" % "core" % "1.0.2"
     )
 }
 
-libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.43"
+libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.46"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.5"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.7.0"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.7.2"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.48"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.73"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 

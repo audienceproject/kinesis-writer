@@ -12,7 +12,7 @@ import org.apache.commons.lang.StringUtils
 import org.apache.logging.log4j.{LogManager, Logger}
 
 import scala.annotation.tailrec
-import scala.collection.JavaConversions._
+import scala.collection.JavaConverters._
 import scala.util.Random
 
 /**
@@ -179,7 +179,7 @@ object PBScalaKinesisWriter {
                         case aggR: AggRecord =>
                             // This should not actually happend
                             logger.warn("A full aggregated was retruned when one was not expected")
-                            if (raygunClient.isDefined) raygunClient.get.Send(new Exception("A full aggregated was retruned when one was not expected"), List("kinesis"))
+                            if (raygunClient.isDefined) raygunClient.get.Send(new Exception("A full aggregated was retruned when one was not expected"), List("kinesis").asJava)
                             aggR
                         case _ => aggregator.clearAndGet
                     }
@@ -248,7 +248,7 @@ object PBScalaKinesisWriter {
         // The spaces are there so that the printed logs are easier to read.
         logger.debug("       Shard        |                  Start                 |                  End                   |                  Middle")
         try {
-            client.describeStream(streamName).getStreamDescription.getShards.map(shard => {
+            client.describeStream(streamName).getStreamDescription.getShards.asScala.map(shard => {
                 val range = shard.getHashKeyRange
                 val middle = BigDecimal(range.getStartingHashKey).+(BigDecimal(range.getEndingHashKey).-(BigDecimal(range.getStartingHashKey))./%(BigDecimal(2))._1)
                 logger.debug(s"${shard.getShardId}|${StringUtils.leftPad(range.getStartingHashKey, 40, " ")}|${StringUtils.leftPad(range.getEndingHashKey, 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
@@ -268,7 +268,7 @@ object PBScalaKinesisWriter {
         if (failCount > maximumRetries ) {
             val finalEx = new Exception(s"Linear back-off failed after $failCount retries. Giving up.")
             logger.error(finalEx)
-            if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis-writer"))
+            if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis-writer").asJava)
             throw ex
         }
         logger.warn(ex.getMessage)
