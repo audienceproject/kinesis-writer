@@ -159,7 +159,17 @@ object PBScalaKinesisWriter {
     private final def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String,
                     it: Iterator[GeneratedMessage], ehks: Array[String], ehk: String, raygunClient: Option[RaygunClient] = None, count: Int): Int = {
         if (it.hasNext) {
-            val message = it.next.toByteArray
+            val nxt = it.next
+            val message = try {
+                nxt.toByteArray
+            } catch {
+                case ex: Throwable =>
+                    logger.error(s"Got an error while trying to serialize $nxt")
+                    if (raygunClient.isDefined) {
+                        raygunClient.get.Send(ex, List("kinesis-writer").asJava)
+                    }
+                    throw ex
+            }
             // Some convoluted logic to make sure the aggregated record is not too large
             val aggRecord = if(aggregator.getSizeBytes >= maximumSize) {
                 if (message.length > maximumLastSize ) {
@@ -177,9 +187,9 @@ object PBScalaKinesisWriter {
                         message
                     ) match {
                         case aggR: AggRecord =>
-                            // This should not actually happend
-                            logger.warn("A full aggregated was retruned when one was not expected")
-                            if (raygunClient.isDefined) raygunClient.get.Send(new Exception("A full aggregated was retruned when one was not expected"), List("kinesis").asJava)
+                            // This should not actually happen
+                            logger.warn("A full aggregated was returned when one was not expected")
+                            if (raygunClient.isDefined) raygunClient.get.Send(new Exception("A full aggregated was returned when one was not expected"), List("kinesis").asJava)
                             aggR
                         case _ => aggregator.clearAndGet
                     }
