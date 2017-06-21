@@ -258,12 +258,14 @@ object PBScalaKinesisWriter {
         // The spaces are there so that the printed logs are easier to read.
         logger.debug("       Shard        |                  Start                 |                  End                   |                  Middle")
         try {
-            client.describeStream(streamName).getStreamDescription.getShards.asScala.map(shard => {
-                val range = shard.getHashKeyRange
-                val middle = BigDecimal(range.getStartingHashKey).+(BigDecimal(range.getEndingHashKey).-(BigDecimal(range.getStartingHashKey))./%(BigDecimal(2))._1)
-                logger.debug(s"${shard.getShardId}|${StringUtils.leftPad(range.getStartingHashKey, 40, " ")}|${StringUtils.leftPad(range.getEndingHashKey, 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
-                middle.toString
-            } ).toArray
+            client.describeStream(streamName).getStreamDescription.getShards.asScala
+                .filter(_.getSequenceNumberRange.getEndingSequenceNumber == null) // Open shards have this set to null
+                .map(shard => {
+                    val range = shard.getHashKeyRange
+                    val middle = BigDecimal(range.getStartingHashKey).+(BigDecimal(range.getEndingHashKey).-(BigDecimal(range.getStartingHashKey))./%(BigDecimal(2))._1)
+                    logger.debug(s"${shard.getShardId}|${StringUtils.leftPad(range.getStartingHashKey, 40, " ")}|${StringUtils.leftPad(range.getEndingHashKey, 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
+                    middle.toString
+                }).toArray
         } catch {
             // Linear back-off mechanism
             case ex: LimitExceededException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
