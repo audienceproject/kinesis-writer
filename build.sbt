@@ -20,15 +20,15 @@ name := "kinesis-writer"
 version := "1.1.3"
 description := "Helper class for writing Protocol Buffer messages to Amazon Kinesis streams with the maximum throughput possible."
 
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.3"
 
 /**
   * Additional scala version supported.
   */
-crossScalaVersions := Seq("2.11.11", "2.12.2")
+crossScalaVersions := Seq("2.11.11", "2.12.3")
 
 libraryDependencies ++= {
-    val log4j2Version = "2.7"
+    val log4j2Version = "2.8.2"
     Seq(
         "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
         "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
@@ -49,9 +49,9 @@ libraryDependencies += "commons-io" % "commons-io" % "2.5"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.7.2"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.8.1"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.73"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.172"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
