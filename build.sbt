@@ -43,7 +43,7 @@ libraryDependencies ++= {
     )
 }
 
-libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.5.46"
+libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.6.1"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.5"
 
