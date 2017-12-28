@@ -3,9 +3,8 @@ package com.audienceproject.aws.kinesis
 import com.amazonaws.AmazonClientException
 import com.amazonaws.kinesis.agg.{AggRecord, RecordAggregator}
 import com.amazonaws.services.kinesis.model.{LimitExceededException, ProvisionedThroughputExceededException}
-import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
+import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.audienceproject.BuildInfo
-import com.mindscapehq.raygun4java.core.RaygunClient
 import com.trueaccord.scalapb.GeneratedMessage
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
@@ -65,9 +64,9 @@ object PBScalaKinesisWriter {
       */
     def write(streamName: String, it: Iterator[GeneratedMessage]): Int = {
         val aggregator = new RecordAggregator
-        val client = new AmazonKinesisClient
-        val ehks = getExplicitHashKeys(streamName, client, 0, None)
-        write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), None, 0)
+        val client = AmazonKinesisClientBuilder.defaultClient()
+        val ehks = getExplicitHashKeys(streamName, client)
+        write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), 0)
     }
 
     /**
@@ -92,72 +91,13 @@ object PBScalaKinesisWriter {
       */
     def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis): Int = {
         val aggregator = new RecordAggregator
-        val ehks = getExplicitHashKeys(streamName, client, 0, None)
-        write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), None, 0)
-    }
-
-    /**
-      * Send an iterator of Protocol Buffer encoded messages to Kinesis. It uses a default Kinesis client built
-      * using DefaultAWSCredentialsProviderChain and the default region.
-      * It also uses a RaygunClient. Raygun is a 3rd party error logging service provider.
-      *
-      * Example:
-      * {{{
-      * val it = List(
-      *     new PBMessage("now"),
-      *     new PBMessage("yesterday"),
-      *     new PBMessage("tomorrow")
-      * ).toIterator
-      *
-      * val raygunClient = new RaygunClient("your-raygunClient-key")
-      *
-      * PBScalaKinesisWriter.write("test-stream", it, raygunClient)
-      * }}}
-      *
-      * @param streamName The name of the Kinesis Stream where the data should go to
-      * @param it The iterator containing Protocol Buffers messages
-      * @param raygunClient The Raygun client which sends exceptions
-      */
-    def write(streamName: String, it: Iterator[GeneratedMessage], raygunClient: RaygunClient): Int = {
-        val aggregator = new RecordAggregator
-        val client = new AmazonKinesisClient
-        val ehks = getExplicitHashKeys(streamName, client, 0, Option(raygunClient))
-        write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), Option(raygunClient), 0)
-    }
-
-    /**
-      * Send an iterator of Protocol Buffer encoded messages to Kinesis.
-      * It also uses a RaygunClient. Raygun is a 3rd party error logging service provider.
-      *
-      * Example:
-      * {{{
-      * val it = List(
-      *     new PBMessage("now"),
-      *     new PBMessage("yesterday"),
-      *     new PBMessage("tomorrow")
-      * ).toIterator
-      *
-      * val client = new AmazonKinesisClient(new ProfileCredentialsProvider("my-custom-profile"))
-      *
-      * val raygunClient = new RaygunClient("your-raygunClient-key")
-      *
-      * PBScalaKinesisWriter.write("test-stream", it, client, raygunClient)
-      * }}}
-      *
-      * @param streamName The name of the Kinesis Stream where the data should go to
-      * @param it The iterator containing Protocol Buffers messages
-      * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
-      * @param raygunClient The Raygun client which sends exceptions
-      */
-    def write(streamName: String, it: Iterator[GeneratedMessage], client: AmazonKinesis, raygunClient: RaygunClient): Int = {
-        val aggregator = new RecordAggregator
-        val ehks = getExplicitHashKeys(streamName, client, 0, Option(raygunClient))
-        write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), Option(raygunClient), 0)
+        val ehks = getExplicitHashKeys(streamName, client)
+        write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), 0)
     }
 
     @tailrec
     private final def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String,
-                    it: Iterator[GeneratedMessage], ehks: Array[String], ehk: String, raygunClient: Option[RaygunClient] = None, count: Int): Int = {
+                    it: Iterator[GeneratedMessage], ehks: Array[String], ehk: String, count: Int): Int = {
         if (it.hasNext) {
             val nxt = it.next
             val message = try {
@@ -165,9 +105,6 @@ object PBScalaKinesisWriter {
             } catch {
                 case ex: Throwable =>
                     logger.error(s"Got an error while trying to serialize $nxt")
-                    if (raygunClient.isDefined) {
-                        raygunClient.get.Send(ex, List("kinesis-writer").asJava)
-                    }
                     throw ex
             }
             // Some convoluted logic to make sure the aggregated record is not too large
@@ -189,7 +126,6 @@ object PBScalaKinesisWriter {
                         case aggR: AggRecord =>
                             // This should not actually happen
                             logger.warn("A full aggregated was returned when one was not expected")
-                            if (raygunClient.isDefined) raygunClient.get.Send(new Exception("A full aggregated was returned when one was not expected"), List("kinesis").asJava)
                             aggR
                         case _ => aggregator.clearAndGet
                     }
@@ -215,13 +151,13 @@ object PBScalaKinesisWriter {
                         sent = true
                     } catch {
                         // Linear back-off mechanism
-                        case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount, raygunClient)
-                        case ex: Throwable => failCount = retryLogic(ex, failCount, raygunClient)
+                        case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount)
+                        case ex: Throwable => failCount = retryLogic(ex, failCount)
                     }
                 } while (!sent)
-                write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), raygunClient, count + aggRecord.getNumUserRecords)
+                write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), count + aggRecord.getNumUserRecords)
             } else {
-                write(aggregator, client, streamName, it, ehks, ehk, raygunClient, count)
+                write(aggregator, client, streamName, it, ehks, ehk, count)
             }
         } else {
             val finalRecord = aggregator.clearAndGet
@@ -236,8 +172,8 @@ object PBScalaKinesisWriter {
                         sent = true
                     } catch {
                         // Linear back-off mechanism
-                        case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount, raygunClient)
-                        case ex: Throwable => failCount = retryLogic(ex, failCount, raygunClient)
+                        case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount)
+                        case ex: Throwable => failCount = retryLogic(ex, failCount)
                     }
                 } while (!sent)
                 count + finalRecord.getNumUserRecords
@@ -254,7 +190,7 @@ object PBScalaKinesisWriter {
     }
 
     @tailrec
-    private final def getExplicitHashKeys(streamName: String, client: AmazonKinesis = new AmazonKinesisClient, failCount: Int = 0, raygunClient: Option[RaygunClient] = None): Array[String] = {
+    private final def getExplicitHashKeys(streamName: String, client: AmazonKinesis = AmazonKinesisClientBuilder.defaultClient(), failCount: Int = 0): Array[String] = {
         // The spaces are there so that the printed logs are easier to read.
         logger.debug("       Shard        |                  Start                 |                  End                   |                  Middle")
         try {
@@ -268,19 +204,18 @@ object PBScalaKinesisWriter {
                 }).toArray
         } catch {
             // Linear back-off mechanism
-            case ex: LimitExceededException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
-            case ex: IllegalArgumentException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
-            case ex: AmazonClientException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
-            case ex: Throwable => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount, raygunClient), raygunClient)
+            case ex: LimitExceededException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
+            case ex: IllegalArgumentException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
+            case ex: AmazonClientException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
+            case ex: Throwable => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
         }
     }
 
-    private def retryLogic(ex: Throwable, failCount: Int, raygunClient: Option[RaygunClient]): Int = {
+    private def retryLogic(ex: Throwable, failCount: Int): Int = {
         // This should be a configuration
         if (failCount > maximumRetries ) {
             val finalEx = new Exception(s"Linear back-off failed after $failCount retries. Giving up.")
             logger.error(finalEx)
-            if (raygunClient.isDefined) raygunClient.get.Send(ex, List("kinesis-writer").asJava)
             throw ex
         }
         logger.warn(ex.getMessage)
