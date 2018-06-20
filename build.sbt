@@ -20,15 +20,15 @@ name := "kinesis-writer"
 version := "1.1.4"
 description := "Helper class for writing Protocol Buffer messages to Amazon Kinesis streams with the maximum throughput possible."
 
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.6"
 
 /**
   * Additional scala version supported.
   */
-crossScalaVersions := Seq("2.11.11", "2.12.3")
+crossScalaVersions := Seq("2.11.12", "2.12.6")
 
 libraryDependencies ++= {
-    val log4j2Version = "2.10.0"
+    val log4j2Version = "2.11.0"
     Seq(
         "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
         "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
@@ -36,17 +36,17 @@ libraryDependencies ++= {
     )
 }
 
-libraryDependencies += "com.trueaccord.scalapb" %% "scalapb-runtime" % "0.6.7"
-
 libraryDependencies += "commons-io" % "commons-io" % "2.6"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.8.8"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.9.1"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.255"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.350"
 
 libraryDependencies += "com.amazonaws" % "amazon-kinesis-aggregator" % "1.0.3"
+
+libraryDependencies += "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
@@ -64,52 +64,49 @@ lazy val root = (project in file(".")).
                     buildInfoPackage := "com.audienceproject"
                 )
 
-assemblyJarName in assembly := name.value + ".jar"
-
 /**
   * Maven specific settings for publishing to support Maven native projects
   */
 publishMavenStyle := true
 publishArtifact in Test := false
 pomIncludeRepository := { _ => false }
-publishTo <<= version { (v: String) =>
+
+publishTo := {
     val nexus = "https://oss.sonatype.org/"
-    if (v.trim.endsWith("SNAPSHOT"))
+    if (version.value.trim.endsWith("SNAPSHOT"))
         Some("snapshots" at nexus + "content/repositories/snapshots")
     else
         Some("releases"  at nexus + "service/local/staging/deploy/maven2")
 }
+
 val publishSnapshot:Command = Command.command("publishSnapshot") { state =>
     val extracted = Project extract state
     import extracted._
     val currentVersion = getOpt(version).get
-    val newState =
-        Command.process(s"""set version := "$currentVersion-SNAPSHOT" """, state)
+    val newState = extracted.append(Seq(version := s"$currentVersion-SNAPSHOT"), state)
     val (s, _) = Project.extract(newState).runTask(PgpKeys.publishSigned in Compile, newState)
     state
 }
 commands ++= Seq(publishSnapshot)
 pomIncludeRepository := { _ => false }
-pomExtra := (
-    <url>https://github.com/audienceproject/kinesis-writer</url>
-    <licenses>
-        <license>
-            <name>MIT License</name>
-            <url>http://www.opensource.org/licenses/mit-license.php</url>
-        </license>
-    </licenses>
-    <scm>
-        <url>git@github.com:audienceproject/kinesis-writer.git</url>
-        <connection>scm:git:git//github.com/audienceproject/kinesis-writer.git</connection>
-        <developerConnection>scm:git:ssh://github.com:audienceproject/kinesis-writer.git</developerConnection>
-    </scm>
-    <developers>
-        <developer>
-            <id>audienceproject</id>
-            <email>adtdev@audienceproject.com</email>
-            <name>AudienceProject Dev</name>
-            <organization>AudienceProject</organization>
-            <organizationUrl>http://www.audienceproject.com</organizationUrl>
-        </developer>
-    </developers>
-)
+pomExtra := <url>https://github.com/audienceproject/kinesis-writer</url>
+<licenses>
+    <license>
+        <name>MIT License</name>
+        <url>http://www.opensource.org/licenses/mit-license.php</url>
+    </license>
+</licenses>
+<scm>
+    <url>git@github.com:audienceproject/kinesis-writer.git</url>
+    <connection>scm:git:git//github.com/audienceproject/kinesis-writer.git</connection>
+    <developerConnection>scm:git:ssh://github.com:audienceproject/kinesis-writer.git</developerConnection>
+</scm>
+<developers>
+    <developer>
+        <id>audienceproject</id>
+        <email>adtdev@audienceproject.com</email>
+        <name>AudienceProject Dev</name>
+        <organization>AudienceProject</organization>
+        <organizationUrl>http://www.audienceproject.com</organizationUrl>
+    </developer>
+</developers>
