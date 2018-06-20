@@ -5,7 +5,7 @@ import com.amazonaws.kinesis.agg.{AggRecord, RecordAggregator}
 import com.amazonaws.services.kinesis.model.{LimitExceededException, ProvisionedThroughputExceededException}
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.audienceproject.BuildInfo
-import com.trueaccord.scalapb.GeneratedMessage
+import com.google.protobuf.GeneratedMessage
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
 import org.apache.logging.log4j.{LogManager, Logger}
