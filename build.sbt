@@ -46,7 +46,7 @@ libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.350"
 
 libraryDependencies += "com.amazonaws" % "amazon-kinesis-aggregator" % "1.0.3"
 
-libraryDependencies += "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
+libraryDependencies += "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
@@ -83,8 +83,8 @@ val publishSnapshot:Command = Command.command("publishSnapshot") { state =>
     val extracted = Project extract state
     import extracted._
     val currentVersion = getOpt(version).get
-    val newState = extracted.append(Seq(version := s"$currentVersion-SNAPSHOT"), state)
-    val (s, _) = Project.extract(newState).runTask(PgpKeys.publishSigned in Compile, newState)
+    val newState = extracted.appendWithoutSession(Seq(version := s"$currentVersion-SNAPSHOT"), state)
+    Project.extract(newState).runTask(PgpKeys.publishSigned in Compile, newState)
     state
 }
 commands ++= Seq(publishSnapshot)
