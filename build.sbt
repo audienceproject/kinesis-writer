@@ -17,18 +17,18 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "1.1.6"
-description := "Helper class for writing Protocol Buffer messages to Amazon Kinesis streams with the maximum throughput possible."
+version := "2.0.0"
+description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.8"
 
 /**
   * Additional scala version supported.
   */
-crossScalaVersions := Seq("2.11.12", "2.12.6")
+crossScalaVersions := Seq("2.11.12", "2.12.8")
 
 libraryDependencies ++= {
-    val log4j2Version = "2.11.0"
+    val log4j2Version = "2.11.1"
     Seq(
         "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
         "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
@@ -40,13 +40,11 @@ libraryDependencies += "commons-io" % "commons-io" % "2.6"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.9.1"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.9.3"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.350"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.466"
 
 libraryDependencies += "com.amazonaws" % "amazon-kinesis-aggregator" % "1.0.3"
-
-libraryDependencies += "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
