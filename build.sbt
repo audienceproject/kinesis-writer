@@ -8,7 +8,7 @@ import java.util.Date
   * The groupId in Maven
   */
 organization := "com.audienceproject"
-
+ThisBuild / versionScheme := Some("early-semver")
 /**
   * The artefactId in Maven
   */
