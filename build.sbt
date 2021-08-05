@@ -82,7 +82,7 @@ val publishSnapshot:Command = Command.command("publishSnapshot") { state =>
     import extracted._
     val currentVersion = getOpt(version).get
     val newState = extracted.appendWithoutSession(Seq(version := s"$currentVersion-SNAPSHOT"), state)
-    Project.extract(newState).runTask(Compile /PgpKeys.publishSigned, newState)
+    Project.extract(newState).runTask(Compile / PgpKeys.publishSigned, newState)
     state
 }
 commands ++= Seq(publishSnapshot)
