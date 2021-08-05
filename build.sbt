@@ -17,18 +17,18 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "2.0.0"
+version := "2.1.0"
 description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.13.6"
 
 /**
   * Additional scala version supported.
   */
-crossScalaVersions := Seq("2.11.12", "2.12.8")
+crossScalaVersions := Seq("2.12.14", "2.13.6")
 
 libraryDependencies ++= {
-    val log4j2Version = "2.11.1"
+    val log4j2Version = "2.14.1"
     Seq(
         "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
         "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
@@ -36,13 +36,13 @@ libraryDependencies ++= {
     )
 }
 
-libraryDependencies += "commons-io" % "commons-io" % "2.6"
+libraryDependencies += "commons-io" % "commons-io" % "2.11.0"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.9.3"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.14.4"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.11.466"
+libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.12.39"
 
 libraryDependencies += "com.amazonaws" % "amazon-kinesis-aggregator" % "1.0.3"
 
@@ -66,7 +66,7 @@ lazy val root = (project in file(".")).
   * Maven specific settings for publishing to support Maven native projects
   */
 publishMavenStyle := true
-publishArtifact in Test := false
+Test / publishArtifact := false
 pomIncludeRepository := { _ => false }
 
 publishTo := {
@@ -82,7 +82,7 @@ val publishSnapshot:Command = Command.command("publishSnapshot") { state =>
     import extracted._
     val currentVersion = getOpt(version).get
     val newState = extracted.appendWithoutSession(Seq(version := s"$currentVersion-SNAPSHOT"), state)
-    Project.extract(newState).runTask(PgpKeys.publishSigned in Compile, newState)
+    Project.extract(newState).runTask(Compile /PgpKeys.publishSigned, newState)
     state
 }
 commands ++= Seq(publishSnapshot)
