@@ -51,7 +51,7 @@ class KinesisWriter {
               .filter(_.getSequenceNumberRange.getEndingSequenceNumber == null) // Open shards have this set to null
               .map(shard => {
                 val range = shard.getHashKeyRange
-                val middle = BigDecimal(range.getStartingHashKey).+(BigDecimal(range.getEndingHashKey).-(BigDecimal(range.getStartingHashKey))./%(BigDecimal(2))._1)
+                val middle = BigInt(range.getStartingHashKey)+(BigInt(range.getEndingHashKey).-(BigInt(range.getStartingHashKey))./%(BigInt(2))._1)
                 logger.debug(s"${shard.getShardId}|${StringUtils.leftPad(range.getStartingHashKey, 40, " ")}|${StringUtils.leftPad(range.getEndingHashKey, 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
                 middle.toString
             }).toArray
