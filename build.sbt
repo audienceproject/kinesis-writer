@@ -17,7 +17,7 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "2.1.2"
+version := "2.1.3"
 description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
 scalaVersion := "2.13.6"
@@ -40,7 +40,7 @@ libraryDependencies += "commons-io" % "commons-io" % "2.11.0"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.14.4"
+libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.8.8"
 
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.12.39"
 
