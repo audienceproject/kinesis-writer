@@ -1,13 +1,13 @@
 package com.audienceproject.aws.kinesis
 
-import com.amazonaws.AmazonClientException
+
 import com.amazonaws.kinesis.agg.{AggRecord, RecordAggregator}
-import com.amazonaws.services.kinesis.model.{LimitExceededException, ProvisionedThroughputExceededException}
-import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClientBuilder}
 import com.audienceproject.BuildInfo
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
 import org.apache.logging.log4j.{LogManager, Logger}
+import software.amazon.awssdk.services.kinesis.KinesisClient
+import software.amazon.awssdk.services.kinesis.model.{DescribeStreamRequest, LimitExceededException, ProvisionedThroughputExceededException}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -43,23 +43,22 @@ class KinesisWriter {
     }
 
     @tailrec
-    final def getExplicitHashKeys(streamName: String, client: AmazonKinesis = AmazonKinesisClientBuilder.defaultClient(), failCount: Int = 0): Array[String] = {
+    final def getExplicitHashKeys(streamName: String, client: KinesisClient = KinesisClient.create(), failCount: Int = 0): Array[String] = {
         // The spaces are there so that the printed logs are easier to read.
         logger.debug("       Shard        |                  Start                 |                  End                   |                  Middle")
         try {
-            client.describeStream(streamName).getStreamDescription.getShards.asScala
-              .filter(_.getSequenceNumberRange.getEndingSequenceNumber == null) // Open shards have this set to null
+            client.describeStream( DescribeStreamRequest.builder().streamName(streamName).build()).streamDescription.shards().asScala
+              .filter(_.sequenceNumberRange.endingSequenceNumber() == null) // Open shards have this set to null
               .map(shard => {
-                val range = shard.getHashKeyRange
-                val middle = BigInt(range.getStartingHashKey)+(BigInt(range.getEndingHashKey).-(BigInt(range.getStartingHashKey))./%(BigInt(2))._1)
-                logger.debug(s"${shard.getShardId}|${StringUtils.leftPad(range.getStartingHashKey, 40, " ")}|${StringUtils.leftPad(range.getEndingHashKey, 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
+                val range = shard.hashKeyRange
+                val middle = BigInt(range.startingHashKey())+(BigInt(range.endingHashKey).-(BigInt(range.startingHashKey()))./%(BigInt(2))._1)
+                logger.debug(s"${shard.shardId()}|${StringUtils.leftPad(range.startingHashKey(), 40, " ")}|${StringUtils.leftPad(range.endingHashKey(), 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
                 middle.toString
             }).toArray
         } catch {
             // Linear back-off mechanism
             case ex: LimitExceededException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
             case ex: IllegalArgumentException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
-            case ex: AmazonClientException => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
             case ex: Throwable => getExplicitHashKeys(streamName, client, retryLogic(ex, failCount))
         }
     }
@@ -99,7 +98,7 @@ object KinesisWriter extends KinesisWriter {
       */
     def write(streamName: String, it: Iterator[Array[Byte]]): Int = {
         val aggregator = new RecordAggregator
-        val client = AmazonKinesisClientBuilder.defaultClient()
+        val client = KinesisClient.create()
         val ehks = getExplicitHashKeys(streamName, client)
         write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), 0)
     }
@@ -123,16 +122,16 @@ object KinesisWriter extends KinesisWriter {
       * @param it The iterator containing byte arrays
       * @param client The Kinesis client responsible for sending the data to the Kinesis Streams
       */
-    def write(streamName: String, it: Iterator[Array[Byte]], client: AmazonKinesis): Int = {
+    def write(streamName: String, it: Iterator[Array[Byte]], client: KinesisClient): Int = {
         val aggregator = new RecordAggregator
         val ehks = getExplicitHashKeys(streamName, client)
         write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), 0)
     }
 
     @tailrec
-    private final def write(aggregator: RecordAggregator, client: AmazonKinesis, streamName: String, it: Iterator[Array[Byte]], ehks: Array[String], ehk: String, count: Int): Int = {
+    private final def write(aggregator: RecordAggregator, client: KinesisClient, streamName: String, it: Iterator[Array[Byte]], ehks: Array[String], ehk: String, count: Int): Int = {
         if (it.hasNext) {
-            val nxt = it.next
+            val nxt = it.next()
             val message = try {
                 nxt
             } catch {
@@ -178,8 +177,11 @@ object KinesisWriter extends KinesisWriter {
                 var failCount = 0
                 do {
                     try {
-                        val response = client.putRecord(putRecordRequest)
-                        logger.info(s"Wrote ${aggRecord.getNumUserRecords} user records to shard ${response.getShardId}")
+                        val response = client.putRecords(putRecordRequest)
+                        if (response.failedRecordCount()>0) {
+                            throw new Exception("record failed")
+                        }
+                        logger.info(s"Wrote ${aggRecord.getNumUserRecords} user records to shard ${response.records().asScala.head.shardId()}")
                         sent = true
                     } catch {
                         // Linear back-off mechanism
@@ -199,8 +201,11 @@ object KinesisWriter extends KinesisWriter {
                 var sent = false
                 do {
                     try {
-                        val response = client.putRecord(putRecordRequest)
-                        logger.info(s"Wrote last ${finalRecord.getNumUserRecords} user records to shard ${response.getShardId}")
+                        val response = client.putRecords(putRecordRequest)
+                        if (response.failedRecordCount()>0) {
+                            throw new Exception("record failed")
+                        }
+                        logger.info(s"Wrote last ${finalRecord.getNumUserRecords} user records to shard ${response.records().asScala.head.shardId()}")
                         sent = true
                     } catch {
                         // Linear back-off mechanism

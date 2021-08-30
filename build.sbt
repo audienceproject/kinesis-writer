@@ -40,11 +40,9 @@ libraryDependencies += "commons-io" % "commons-io" % "2.11.0"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-client" % "1.8.8"
+libraryDependencies += "software.amazon.kinesis" % "amazon-kinesis-client" % "2.3.6"
 
-libraryDependencies += "com.amazonaws" % "aws-java-sdk-kinesis" % "1.12.39"
 
-libraryDependencies += "com.amazonaws" % "amazon-kinesis-aggregator" % "1.0.3"
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
