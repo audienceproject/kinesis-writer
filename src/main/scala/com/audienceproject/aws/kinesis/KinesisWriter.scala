@@ -51,7 +51,7 @@ class KinesisWriter {
               .filter(_.sequenceNumberRange.endingSequenceNumber() == null) // Open shards have this set to null
               .map(shard => {
                 val range = shard.hashKeyRange
-                val middle = BigInt(range.startingHashKey())+(BigInt(range.endingHashKey).-(BigInt(range.startingHashKey()))./%(BigInt(2))._1)
+                val middle = BigInt(range.startingHashKey())+ BigInt(range.endingHashKey).-(BigInt(range.startingHashKey()))./%(BigInt(2))._1
                 logger.debug(s"${shard.shardId()}|${StringUtils.leftPad(range.startingHashKey(), 40, " ")}|${StringUtils.leftPad(range.endingHashKey(), 40, " ")}|${StringUtils.leftPad(middle.toString, 40, " ")}")
                 middle.toString
             }).toArray
@@ -136,7 +136,7 @@ object KinesisWriter extends KinesisWriter {
                 nxt
             } catch {
                 case ex: Throwable =>
-                    logger.error(s"Got an error while trying to serialize $nxt")
+                    logger.error(s"Got an error while trying to serialize ${nxt.mkString("Array(", ", ", ")")}")
                     throw ex
             }
             // Some convoluted logic to make sure the aggregated record is not too large
