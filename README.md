@@ -9,7 +9,7 @@ The data that is supposed to be written to the Kinesis Stream has to be an `Arra
 Include the library in your project's `build.sbt` file:
 
 ```
-libraryDependencies += "com.audienceproject" %% "kinesis-writer" % "2.0.0"
+libraryDependencies += "com.audienceproject" %% "kinesis-writer" % "3.0.1"
 ```
 
 Easiest is to just to provide the Kinesis Stream name and the iterator. The Kinesis client is build for you with the default profile credentials provider.
@@ -41,6 +41,7 @@ ScalaKinesisWriter.write("test-stream", it, client)
 
 ## Known issues
 
+Has code copy pasted from: https://github.com/awslabs/kinesis-aggregation/tree/master/java/KinesisAggregatorV2 due to it not being on maven and manual lib dependencies being subpar.
 #### Magical numbers
 
 To make sure that data is successfully consumed on the other side of the _Kinesis_ stream, the maximum record size has empirically been made smaller than what _Amazon_ lists as maximum.
