@@ -17,7 +17,7 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "3.0.1"
+version := "3.0.2"
 description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
 scalaVersion := "2.13.6"
@@ -28,7 +28,7 @@ scalaVersion := "2.13.6"
 crossScalaVersions := Seq("2.12.14", "2.13.6")
 
 libraryDependencies ++= {
-    val log4j2Version = "2.14.1"
+    val log4j2Version = "2.15.0"
     Seq(
         "org.apache.logging.log4j" % "log4j-api" % log4j2Version,
         "org.apache.logging.log4j" % "log4j-core" % log4j2Version,
