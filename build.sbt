@@ -17,11 +17,18 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "3.0.2"
+version := "3.1.0"
 description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
 scalaVersion := "2.13.6"
-
+javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
+scalacOptions := Seq("-target:jvm-1.8")
+initialize := {
+    val _ = initialize.value
+    val javaVersion = sys.props("java.specification.version")
+    if (javaVersion != "1.8")
+        sys.error("Java 1.8 is required for this project. Found " + javaVersion + " instead")
+}
 /**
   * Additional scala version supported.
   */
