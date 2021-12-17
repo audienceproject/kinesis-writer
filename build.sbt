@@ -17,7 +17,7 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "3.1.1"
+version := "3.1.2"
 description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
 scalaVersion := "2.13.6"
@@ -47,7 +47,7 @@ libraryDependencies += "commons-io" % "commons-io" % "2.11.0"
 
 libraryDependencies += "commons-lang" % "commons-lang" % "2.6"
 
-libraryDependencies += "software.amazon.kinesis" % "amazon-kinesis-client" % "2.3.6"
+libraryDependencies += "software.amazon.kinesis" % "amazon-kinesis-client" % "2.3.9"
 // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
 libraryDependencies += "org.apache.commons" % "commons-compress" % "1.21" // found security issue in 1.20
 

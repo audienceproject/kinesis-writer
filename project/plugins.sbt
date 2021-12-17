@@ -1,6 +1,6 @@
 logLevel := Level.Warn
 
-addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.1")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.5.3")
 
 addDependencyTreePlugin
 addSbtPlugin("com.jsuereth" % "sbt-pgp" % "2.0.1")
