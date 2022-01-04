@@ -1,13 +1,13 @@
 package com.audienceproject.aws.kinesis
 
 
-import com.amazonaws.kinesis.agg.{AggRecord, RecordAggregator}
+import com.amazonaws.kinesis.agg.AggRecord
 import com.audienceproject.BuildInfo
 import org.apache.commons.io.FileUtils
 import org.apache.commons.lang.StringUtils
 import org.apache.logging.log4j.{LogManager, Logger}
 import software.amazon.awssdk.services.kinesis.KinesisClient
-import software.amazon.awssdk.services.kinesis.model.{DescribeStreamRequest, LimitExceededException, ProvisionedThroughputExceededException, Shard}
+import software.amazon.awssdk.services.kinesis.model._
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -64,7 +64,7 @@ class KinesisWriter {
   }
 
   @tailrec
-  private def getAllShards(streamName: String, client: KinesisClient, nextToken: Option[String]=None, acc: Seq[Shard] = Seq.empty): Seq[Shard] = {
+  private def getAllShards(streamName: String, client: KinesisClient, nextToken: Option[String] = None, acc: Seq[Shard] = Seq.empty): Seq[Shard] = {
     val req = if (nextToken.isDefined) {
       DescribeStreamRequest.builder().streamName(streamName).exclusiveStartShardId(nextToken.get).build()
     } else {
@@ -113,7 +113,7 @@ object KinesisWriter extends KinesisWriter {
     * @param it         The iterator containing byte arrays
     */
   def write(streamName: String, it: Iterator[Array[Byte]]): Int = {
-    val aggregator = new RecordAggregator
+    val aggregator = new MyAggregator
     val client = KinesisClient.create()
     val ehks = getExplicitHashKeys(streamName, client)
     write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), 0)
@@ -139,26 +139,19 @@ object KinesisWriter extends KinesisWriter {
     * @param client     The Kinesis client responsible for sending the data to the Kinesis Streams
     */
   def write(streamName: String, it: Iterator[Array[Byte]], client: KinesisClient): Int = {
-    val aggregator = new RecordAggregator
+    val aggregator = new MyAggregator
     val ehks = getExplicitHashKeys(streamName, client)
     write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), 0)
   }
 
   @tailrec
-  private final def write(aggregator: RecordAggregator, client: KinesisClient, streamName: String, it: Iterator[Array[Byte]], ehks: Array[String], ehk: String, count: Int): Int = {
+  private final def write(aggregator: MyAggregator, client: KinesisClient, streamName: String, it: Iterator[Array[Byte]], ehks: Array[String], ehk: String, count: Int): Int = {
     if (it.hasNext) {
-      val nxt = it.next()
-      val message = try {
-        nxt
-      } catch {
-        case ex: Throwable =>
-          logger.error(s"Got an error while trying to serialize ${nxt.mkString("Array(", ", ", ")")}")
-          throw ex
-      }
+      val message = it.next()
       // Some convoluted logic to make sure the aggregated record is not too large
-      val aggRecord = if (aggregator.getSizeBytes >= maximumSize) {
+      val (aggRecord, batch) = if (aggregator.getSizeBytes >= maximumSize) {
         if (message.length > maximumLastSize) {
-          val aggR = aggregator.clearAndGet
+          val aggR = aggregator.clearAndGet()
           aggregator.addUserRecord(
             "a",
             ehk,
@@ -171,11 +164,11 @@ object KinesisWriter extends KinesisWriter {
             ehk,
             message
           ) match {
-            case aggR: AggRecord =>
+            case (aggR: AggRecord, batch: Seq[Array[Byte]]) =>
               // This should not actually happen
               logger.warn("A full aggregated was returned when one was not expected")
-              aggR
-            case _ => aggregator.clearAndGet
+              (aggR, batch)
+            case _ => aggregator.clearAndGet()
           }
         }
       } else {
@@ -186,49 +179,16 @@ object KinesisWriter extends KinesisWriter {
         )
       }
       if (aggRecord != null) {
-        logger.info(s"Sending ${aggRecord.getNumUserRecords} user records of a size of ${FileUtils.byteCountToDisplaySize(aggRecord.getSizeBytes)}.")
-        val putRecordRequest = aggRecord.toPutRecordRequest(streamName)
-        var sent = false
-        // Needs to be set via a configuration variable
-        var failCount = 0
-        do {
-          try {
-            val response = client.putRecords(putRecordRequest)
-            if (response.failedRecordCount() > 0) {
-              throw new Exception("record failed")
-            }
-            logger.info(s"Wrote ${aggRecord.getNumUserRecords} user records to shard ${response.records().asScala.head.shardId()}")
-            sent = true
-          } catch {
-            // Linear back-off mechanism
-            case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount)
-            case ex: Throwable => failCount = retryLogic(ex, failCount)
-          }
-        } while (!sent)
+
+        sendAggRecord(client, aggRecord, batch, streamName, ehks)
         write(aggregator, client, streamName, it, ehks, getExplicitHashKey(ehks, streamName), count + aggRecord.getNumUserRecords)
       } else {
         write(aggregator, client, streamName, it, ehks, ehk, count)
       }
     } else {
-      val finalRecord = aggregator.clearAndGet
+      val (finalRecord, batch) = aggregator.clearAndGet()
       if (finalRecord != null) {
-        val putRecordRequest = finalRecord.toPutRecordRequest(streamName)
-        var failCount = 0
-        var sent = false
-        do {
-          try {
-            val response = client.putRecords(putRecordRequest)
-            if (response.failedRecordCount() > 0) {
-              throw new Exception("record failed")
-            }
-            logger.info(s"Wrote last ${finalRecord.getNumUserRecords} user records to shard ${response.records().asScala.head.shardId()}")
-            sent = true
-          } catch {
-            // Linear back-off mechanism
-            case ex: ProvisionedThroughputExceededException => failCount = retryLogic(ex, failCount)
-            case ex: Throwable => failCount = retryLogic(ex, failCount)
-          }
-        } while (!sent)
+        sendAggRecord(client, finalRecord, batch, streamName, ehks)
         count + finalRecord.getNumUserRecords
       } else {
         count
@@ -236,4 +196,30 @@ object KinesisWriter extends KinesisWriter {
     }
   }
 
+  def sendAggRecord(client: KinesisClient, aggRecord: AggRecord, batch: Seq[Array[Byte]], streamName: String, ehks: Array[String]) = {
+    logger.info(s"Sending ${aggRecord.getNumUserRecords} user records of a size of ${FileUtils.byteCountToDisplaySize(aggRecord.getSizeBytes)}.")
+
+    var putRecordsRequest = aggRecord.toPutRecordRequest(streamName)
+    var sent = false
+    // Needs to be set via a configuration variable
+    var failCount = 0
+    do {
+      try {
+        val response = client.putRecords(putRecordsRequest)
+
+        if (response.failedRecordCount() > 0) {
+          throw new Exception("record failed")
+        }
+        logger.info(s"Wrote ${aggRecord.getNumUserRecords} user records to shard ${response.records().asScala.head.shardId()}")
+        sent = true
+      } catch {
+        case ex: Throwable =>
+          val aggregator = new MyAggregator()
+          val ehk = getExplicitHashKey(ehks, streamName)
+          for (item <- batch) aggregator.addUserRecord("a", ehk, item)
+          putRecordsRequest = aggregator.clearAndGet()._1.toPutRecordRequest(streamName)
+          failCount = retryLogic(ex, failCount)
+      }
+    } while (!sent)
+  }
 }
