@@ -216,8 +216,12 @@ object KinesisWriter extends KinesisWriter {
         case ex: Throwable =>
           val aggregator = new MyAggregator()
           val ehk = getExplicitHashKey(ehks, streamName)
-          for (item <- batch) aggregator.addUserRecord("a", ehk, item)
-          putRecordsRequest = aggregator.clearAndGet()._1.toPutRecordRequest(streamName)
+          var currentAggRecord:AggRecord=null
+          for (item <- batch) {
+            currentAggRecord =aggregator.addUserRecord("a", ehk, item)._1
+          }
+          if (aggRecord==null) currentAggRecord=aggregator.clearAndGet()._1
+          putRecordsRequest = currentAggRecord.toPutRecordRequest(streamName)
           failCount = retryLogic(ex, failCount)
       }
     } while (!sent)
