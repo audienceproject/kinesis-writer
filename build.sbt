@@ -17,7 +17,7 @@ name := "kinesis-writer"
 /**
   * The version must match "&#94;(\\d+\\.\\d+\\.\\d+)$" to be considered a release
   */
-version := "3.2.0"
+version := "3.2.1"
 description := "Helper class for writing byte[] messages to Amazon Kinesis streams with the maximum throughput possible."
 
 scalaVersion := "2.12.14"

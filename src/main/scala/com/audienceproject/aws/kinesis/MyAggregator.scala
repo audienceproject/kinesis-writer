@@ -7,7 +7,7 @@ import scala.collection.mutable
 
 class MyAggregator {
   val aggregator = new RecordAggregator()
-  private val dataList = mutable.ArrayBuffer.empty[Array[Byte]]
+  private val dataList = mutable.ListBuffer.empty[Array[Byte]]
   def addUserRecord(partitionKey: String, explicitHashKey: String, data: Array[Byte]): (AggRecord,List[Array[Byte]]) = {
     val result = aggregator.addUserRecord(partitionKey, explicitHashKey, data)
     dataList.append(data)
@@ -16,8 +16,9 @@ class MyAggregator {
 
   def clearAndGet(): (AggRecord,List[Array[Byte]]) = {
     val result = aggregator.clearAndGet()
+    val list = dataList.toList
     dataList.clear()
-    (result,dataList.toList)
+    (result,list)
   }
   def getSizeBytes() = aggregator.getSizeBytes()
 }
